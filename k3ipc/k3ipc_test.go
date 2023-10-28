@@ -1,7 +1,6 @@
 package k3ipc
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 )
@@ -27,8 +26,7 @@ func TestK3INT(t *testing.T) {
 	check(t, int32(1234), "1 0 0 0 8 0 0 0 1 0 0 0 210 4 0 0")
 }
 func TestK3FLT(t *testing.T) {
-	fmt.Println("TODO: TestK3FLT")
-	// check(t, float64(1.1), "1 0 0 0 16 0 0 0 2 0 0 0 1 0 0 0 154 153 153 153 153 153 241 63")
+	check(t, float64(1.1), "1 0 0 0 16 0 0 0 2 0 0 0 1 0 0 0 154 153 153 153 153 153 241 63")
 }
 func TestK3CHR(t *testing.T) {
 	check(t, byte('x'), "1 0 0 0 8 0 0 0 3 0 0 0 120 0 0 0")

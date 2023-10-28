@@ -106,6 +106,8 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 		return res
 	case K3FLT:
 		var tmp uint64
+		var pad uint32
+		binary.Read(r, ord, &pad)
 		binary.Read(r, ord, &tmp)
 		return float64(math.Float64frombits(tmp))
 	case K3CHR:
@@ -184,12 +186,16 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 		return emitBd(buf, ord, int32(val))
 	case int32:
 		dLen = 8
-		writeI32(buf, ord, K3INT)
+		binary.Write(buf, ord, int32(K3INT))
 		writeI32(buf, ord, int32(val))
 	case []int32:
 		panic("todo: []int32")
 	case float64:
-		panic("todo: float64")
+		dLen = 16
+		writeI32(buf, ord, K3FLT)
+		// k sticks an extra int here to keep it 64-bit aligned
+		writeI32(buf, ord, 1)
+		binary.Write(buf, ord, val)
 	case []float64:
 		panic("todo: []float64")
 	case byte: // note 'x' is an int32. this is byte('x')
