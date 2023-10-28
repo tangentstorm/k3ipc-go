@@ -161,10 +161,6 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 	}
 }
 
-func writeI32(w *bytes.Buffer, ord binary.ByteOrder, n int32) {
-	binary.Write(w, ord, n)
-}
-
 // bytes from K3 data
 func Bd(val any) (res []byte) {
 	ord := binary.LittleEndian
@@ -179,56 +175,55 @@ func Bd(val any) (res []byte) {
 
 // recursively write data into the buffer
 func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
-	dLen = 0
-	switch val := val.(type) {
+	switch v := val.(type) {
 	case int:
 		// TODO: handle 64-bit ints ?
-		return emitBd(buf, ord, int32(val))
+		return emitBd(buf, ord, int32(v))
 	case int32:
-		dLen = 8
 		binary.Write(buf, ord, int32(K3INT))
-		writeI32(buf, ord, int32(val))
+		binary.Write(buf, ord, int32(v))
+		return 8
 	case []int32:
 		panic("todo: []int32")
 	case float64:
 		dLen = 16
-		writeI32(buf, ord, K3FLT)
+		binary.Write(buf, ord, int32(K3FLT))
 		// k sticks an extra int here to keep it 64-bit aligned
-		writeI32(buf, ord, 1)
-		binary.Write(buf, ord, val)
+		binary.Write(buf, ord, int32(1))
+		binary.Write(buf, ord, v)
 	case []float64:
 		panic("todo: []float64")
 	case byte: // note 'x' is an int32. this is byte('x')
 		dLen = 8 // KCHR is always padded
-		writeI32(buf, ord, K3CHR)
-		buf.Write([]byte{val, 0, 0, 0})
+		binary.Write(buf, ord, int32(K3CHR))
+		buf.Write([]byte{v, 0, 0, 0})
 	case string: // TODO: handle utf-8?
-		dLen = 8 + len(val) + 1 // strlen + \0
-		writeI32(buf, ord, -K3CHR)
-		writeI32(buf, ord, int32(len(val)))
-		buf.Write([]byte(val))
+		dLen = 8 + len(v) + 1 // strlen + \0
+		binary.Write(buf, ord, int32(-K3CHR))
+		binary.Write(buf, ord, int32(len(v)))
+		buf.Write([]byte(v))
 		buf.WriteByte(0)
 	case KSym: // sym("abc")
-		dLen = 4 + len(val.s) + 1
+		dLen = 4 + len(v.s) + 1
 		// no string length for symbols
-		writeI32(buf, ord, K3SYM)
-		buf.Write([]byte(val.s))
+		binary.Write(buf, ord, int32(K3SYM))
+		buf.Write([]byte(v.s))
 		buf.WriteByte(0)
 	case []KSym: // []KSym{sym("abc")}
-		writeI32(buf, ord, -K3SYM)
-		writeI32(buf, ord, int32(len(val)))
+		binary.Write(buf, ord, int32(-K3SYM))
+		binary.Write(buf, ord, int32(len(v)))
 		strlens := 0
-		for _, s := range val {
+		for _, s := range v {
 			strlens += len(s.s) + 1
 			buf.Write([]byte(s.s))
 			buf.WriteByte(0)
 		}
 		dLen = 8 + strlens
 	case []any:
-		writeI32(buf, ord, K3LST)
-		writeI32(buf, ord, int32(len(val)))
+		binary.Write(buf, ord, int32(K3LST))
+		binary.Write(buf, ord, int32(len(v)))
 		dLen = 8 // those two ints, plus...
-		for _, v := range val {
+		for _, v := range v {
 			dLen += emitBd(buf, ord, v)
 			// pad to 8-byte boundary
 			for buf.Len()%8 != 0 {
@@ -239,13 +234,13 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 	case map[string]any:
 		panic("todo: map[string]any")
 	default:
-		if val == nil {
+		if v == nil {
 			dLen = 8
-			writeI32(buf, ord, K3NUL)
-			writeI32(buf, ord, 0)
+			binary.Write(buf, ord, int32(K3NUL))
+			binary.Write(buf, ord, int32(0))
 			break
 		}
-		panic(fmt.Sprintf("Db: don't know how to generate bytes for %v (type:%T)", val, val))
+		panic(fmt.Sprintf("Db: don't know how to generate bytes for %v (type:%T)", v, v))
 	}
 	return
 }
