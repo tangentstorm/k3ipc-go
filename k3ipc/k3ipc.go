@@ -1,10 +1,10 @@
 package k3ipc
 
 import (
-	"C"
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -26,9 +26,8 @@ type KSym struct{ s string }
 func sym(s string) KSym       { return KSym{s} }
 func (s KSym) String() string { return "`" + s.s }
 
-// numstrToBytes
-// convert a string of space-separated numbers into a byte array
-// with one byte per number
+// convert a string of space-separated numbers into a
+// byte array, with one byte per number
 func NumStrToBytes(s string) []byte {
 	nums := strings.Split(s, " ")
 	bytes := make([]byte, len(nums))
@@ -39,7 +38,6 @@ func NumStrToBytes(s string) []byte {
 	return bytes
 }
 
-// inverse of NumStrToBytes
 func BytesToNumStr(bytes []byte) string {
 	nums := make([]string, len(bytes))
 	for i, v := range bytes {
@@ -53,6 +51,7 @@ type MsgHeader struct {
 	msgType   byte
 	msgLen    int32
 	dataType  int32
+	count     int32
 }
 
 func parseMessageHeader(r *bytes.Reader) (h MsgHeader) {
@@ -66,7 +65,22 @@ func parseMessageHeader(r *bytes.Reader) (h MsgHeader) {
 	h.msgType, _ = r.ReadByte()
 	binary.Read(r, h.byteOrder, &h.msgLen)
 	binary.Read(r, h.byteOrder, &h.dataType)
+	if h.dataType < 0 {
+		binary.Read(r, h.byteOrder, &h.count)
+	}
 	return
+}
+
+func readSym(r *bytes.Reader) KSym {
+	var tok []byte
+	for {
+		b, _ := r.ReadByte()
+		if b == 0 {
+			break
+		}
+		tok = append(tok, b)
+	}
+	return sym(string(tok))
 }
 
 // K3 data from bytes
@@ -80,23 +94,28 @@ func Db(buf []byte) any {
 		binary.Read(r, h.byteOrder, &res)
 		return res
 	case K3FLT:
-		var res C.double
-		binary.Read(r, h.byteOrder, &res)
-		return float64(res)
+		var tmp uint64
+		binary.Read(r, h.byteOrder, &tmp)
+		return float64(math.Float64frombits(tmp))
 	case K3CHR:
 		var res byte
 		res, _ = r.ReadByte()
 		return res
 	case -K3CHR:
 		var res string
-		len := bytes.IndexByte(buf[dataStart:], 0)
-		res = string(buf[dataStart : dataStart+len])
+		res = string(buf[dataStart : dataStart+h.count])
 		return res
 	case K3SYM:
 		// symbol doesn't include length, so data starts at 12
 		// and the msgLen is 4 bytes longer, not 8
 		// then there's a null terminator so subtract 1 for that too
 		return sym(string(buf[12 : 12+h.msgLen-5]))
+	case -K3SYM:
+		var res []KSym
+		for i := 0; i < int(h.count); i++ {
+			res = append(res, readSym(r))
+		}
+		return res
 	case K3NUL:
 		return nil
 	default:
@@ -104,7 +123,11 @@ func Db(buf []byte) any {
 	}
 }
 
-// K3 data to bytes
+func writeI32(w *bytes.Buffer, ord binary.ByteOrder, n int32) {
+	binary.Write(w, ord, n)
+}
+
+// bytes from K3 data
 func Bd(val any) (res []byte) {
 	ord := binary.LittleEndian
 	buf := bytes.NewBuffer([]byte{
@@ -118,8 +141,7 @@ func Bd(val any) (res []byte) {
 	switch val := val.(type) {
 	case int32:
 		dLen = 4
-		buf.Write([]byte{0, 0, 0, 0})
-		ord.PutUint32(buf.Bytes()[dStart:], uint32(val))
+		writeI32(buf, ord, val)
 	case byte:
 		dTyp, dLen = K3CHR, 4
 		buf.Write([]byte{val, 0, 0, 0})
@@ -128,12 +150,22 @@ func Bd(val any) (res []byte) {
 		// no string length for symbols
 		buf.Write([]byte(val.s))
 		buf.WriteByte(0)
+	case []KSym:
+		strlens := 0
+		for _, s := range val {
+			strlens += len(s.s) + 1
+		}
+		dTyp, dLen = -K3SYM, 4+strlens
+		writeI32(buf, ord, int32(len(val)))
+		for _, s := range val {
+			buf.Write([]byte(s.s))
+			buf.WriteByte(0)
+		}
 	case string:
 		dTyp = -K3CHR
 		dLen = 4 + len(val) + 1 // strlen + \0
 		// store the string length:
-		buf.Write([]byte{0, 0, 0, 0})
-		ord.PutUint32(buf.Bytes()[dStart:], uint32(dLen-5))
+		writeI32(buf, ord, int32(dLen-5))
 		buf.Write([]byte(val))
 		buf.WriteByte(0)
 	default:
@@ -142,7 +174,7 @@ func Bd(val any) (res []byte) {
 			buf.Write([]byte{0, 0, 0, 0})
 			break
 		}
-		panic(val)
+		panic(fmt.Sprintf("don't know how to generate bytes for %v", val))
 	}
 	ord.PutUint32(buf.Bytes()[4:], uint32(dLen+tLen))
 	ord.PutUint32(buf.Bytes()[8:], uint32(dTyp))
