@@ -186,29 +186,30 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 	case []int32:
 		panic("todo: []int32")
 	case float64:
-		dLen = 16
 		binary.Write(buf, ord, int32(K3FLT))
 		// k sticks an extra int here to keep it 64-bit aligned
 		binary.Write(buf, ord, int32(1))
 		binary.Write(buf, ord, v)
+		return 16
 	case []float64:
 		panic("todo: []float64")
 	case byte: // note 'x' is an int32. this is byte('x')
-		dLen = 8 // KCHR is always padded
 		binary.Write(buf, ord, int32(K3CHR))
+		// KCHR is always padded to 4 bytes:
 		buf.Write([]byte{v, 0, 0, 0})
-	case string: // TODO: handle utf-8?
-		dLen = 8 + len(v) + 1 // strlen + \0
+		return 8
+	case string: // !! does this already handle utf-8?
 		binary.Write(buf, ord, int32(-K3CHR))
 		binary.Write(buf, ord, int32(len(v)))
 		buf.Write([]byte(v))
 		buf.WriteByte(0)
+		return 8 + len(v) + 1 // strlen + \0
 	case KSym: // sym("abc")
-		dLen = 4 + len(v.s) + 1
 		// no string length for symbols
 		binary.Write(buf, ord, int32(K3SYM))
 		buf.Write([]byte(v.s))
 		buf.WriteByte(0)
+		return 4 + len(v.s) + 1
 	case []KSym: // []KSym{sym("abc")}
 		binary.Write(buf, ord, int32(-K3SYM))
 		binary.Write(buf, ord, int32(len(v)))
@@ -218,7 +219,7 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 			buf.Write([]byte(s.s))
 			buf.WriteByte(0)
 		}
-		dLen = 8 + strlens
+		return 8 + strlens
 	case []any:
 		binary.Write(buf, ord, int32(K3LST))
 		binary.Write(buf, ord, int32(len(v)))
@@ -231,6 +232,7 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 				dLen++
 			}
 		}
+		return
 	case map[string]any:
 		panic("todo: map[string]any")
 	default:
@@ -238,9 +240,8 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 			dLen = 8
 			binary.Write(buf, ord, int32(K3NUL))
 			binary.Write(buf, ord, int32(0))
-			break
+			return
 		}
 		panic(fmt.Sprintf("Db: don't know how to generate bytes for %v (type:%T)", v, v))
 	}
-	return
 }
