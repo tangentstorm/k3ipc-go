@@ -137,7 +137,6 @@ func Bd(val any) (res []byte) {
 	})
 	const tLen = 4
 	dLen, dTyp := 0, K3INT
-	const dStart = 12
 	switch val := val.(type) {
 	case int32:
 		dLen = 4
