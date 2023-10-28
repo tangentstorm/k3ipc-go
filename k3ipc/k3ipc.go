@@ -72,7 +72,7 @@ func parseMessageHeader(r *bytes.Reader) (h MsgHeader) {
 
 func parseChunkHeader(ord binary.ByteOrder, r *bytes.Reader) (h chunkHeader) {
 	binary.Read(r, ord, &h.dataType)
-	if h.dataType <= 0 {
+	if h.dataType <= 0 || h.dataType == K3DCT {
 		binary.Read(r, ord, &h.count)
 	}
 	return
@@ -98,6 +98,13 @@ func Db(buf []byte) any {
 }
 
 func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
+	alignIfNecessary := func(dLen int) {
+		if align && (dLen%8 != 0) {
+			for i := 0; i < 8-dLen%8; i++ {
+				r.ReadByte() // ignore padding
+			}
+		}
+	}
 	ch := parseChunkHeader(ord, r)
 	switch ch.dataType {
 	case K3INT:
@@ -121,11 +128,7 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 		buf := make([]byte, ch.count)
 		r.Read(buf)
 		r.ReadByte() // ignore \0
-		if align && ((ch.count+1)%8 != 0) {
-			for i := 0; i < 8-(int(ch.count)+1)%8; i++ {
-				r.ReadByte() // ignore padding
-			}
-		}
+		alignIfNecessary(int(ch.count) + 1)
 		return string(buf)
 	case K3SYM:
 		// symbol doesn't include length. We just read until \0
@@ -134,10 +137,10 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 			b, _ := r.ReadByte()
 			if b == 0 {
 				break
-			} else {
-				str += string(b)
 			}
+			str += string(b)
 		}
+		alignIfNecessary(len(str) + 5)
 		return sym(str)
 	case -K3SYM:
 		var res []KSym
@@ -155,6 +158,14 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 		return res
 	case K3DCT:
 		res := map[string]any{}
+		for i := 0; i < int(ch.count); i++ {
+			// each entry is a string key + value + attributes
+			// !! we ignore attributes for now
+			kva := readDb(ord, r, false)
+			k := kva.([]any)[0].(KSym)
+			v := kva.([]any)[1]
+			res[k.s] = v
+		}
 		return res
 	default:
 		panic("TODO: parse type #" + fmt.Sprintf("%v", ch.dataType))
@@ -234,7 +245,14 @@ func emitBd(buf *bytes.Buffer, ord binary.ByteOrder, val any) (dLen int) {
 		}
 		return
 	case map[string]any:
-		panic("todo: map[string]any")
+		binary.Write(buf, ord, int32(K3DCT))
+		binary.Write(buf, ord, int32(len(v)))
+		dLen = 8 // plus...
+		for k, x := range v {
+			kva := []any{sym(k), x, nil}
+			dLen += emitBd(buf, ord, kva)
+		}
+		return
 	default:
 		if v == nil {
 			dLen = 8

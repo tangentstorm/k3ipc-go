@@ -58,5 +58,5 @@ func TestK3LST(t *testing.T) {
 }
 func TestK3DCT(t *testing.T) {
 	check(t, map[string]any{}, "1 0 0 0 8 0 0 0 5 0 0 0 0 0 0 0")
-	check(t, map[string]any{"k": 123}, "1 0 0 0 40 0 0 0 5 0 0 0 1 0 0 0 0 0 0 0 3 0 0 0 4 0 0 0 107 0 0 0 1 0 0 0 123 0 0 0 6 0 0 0 0 0 0 0")
+	check(t, map[string]any{"k": int32(123)}, "1 0 0 0 40 0 0 0 5 0 0 0 1 0 0 0 0 0 0 0 3 0 0 0 4 0 0 0 107 0 0 0 1 0 0 0 123 0 0 0 6 0 0 0 0 0 0 0")
 }
