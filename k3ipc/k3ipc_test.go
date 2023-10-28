@@ -1,16 +1,21 @@
 package k3ipc
 
 import (
+	"reflect"
 	"testing"
 )
 
+func ne(x, y any) bool {
+	return !reflect.DeepEqual(x, y)
+}
+
 func check(t *testing.T, expectValue any, expectedBytes string) {
 	actualValue := Db(NumStrToBytes(expectedBytes))
-	if actualValue != expectValue {
+	if ne(actualValue, expectValue) {
 		t.Errorf("Db() failed. Expected %v but got %v", expectValue, actualValue)
 	}
 	actualBytes := BytesToNumStr(Bd(expectValue))
-	if actualBytes != expectedBytes {
+	if ne(actualBytes, expectedBytes) {
 		t.Errorf("Bd() failed.\nexpect: %v\nactual: %v", expectedBytes, actualBytes)
 	}
 }
