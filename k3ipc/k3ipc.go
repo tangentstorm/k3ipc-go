@@ -10,6 +10,12 @@ import (
 )
 
 const (
+	SET_MSG = byte(0) // 3: -> .m.s
+	GET_MSG = byte(1) // 4: -> .m.g
+	RES_MSG = byte(2) // response to 4: from .m.g
+)
+
+const (
 	K3LST = iota
 	K3INT
 	K3FLT
@@ -170,6 +176,12 @@ func readDb(ord binary.ByteOrder, r *bytes.Reader, align bool) any {
 	default:
 		panic("TODO: parse type #" + fmt.Sprintf("%v", ch.dataType))
 	}
+}
+
+func K3Msg(val any, msgType byte) (res []byte) {
+	res = Bd(val)
+	res[3] = msgType
+	return
 }
 
 // bytes from K3 data

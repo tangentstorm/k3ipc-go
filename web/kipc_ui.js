@@ -11,7 +11,7 @@ var app = new Vue({
   el: '#app',
   data: {
     n:1, history:[], histCursor:-1, waitsym:0,
-    log: [], draft:'', input: '\\! {*+ x (+\\|:)\\ 1 1} 16' },
+    log: [], draft:'', input: '{*+ x (+\\|:)\\ 1 1} 16' },
   methods: {
 
     send(k) {
