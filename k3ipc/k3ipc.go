@@ -49,7 +49,7 @@ func BytesToNumStr(bytes []byte) string {
 type MsgHeader struct {
 	byteOrder binary.ByteOrder
 	msgType   byte
-	msgLen    int32
+	MsgLen    int32
 }
 
 type chunkHeader struct {
@@ -57,7 +57,7 @@ type chunkHeader struct {
 	count    int32
 }
 
-func parseMessageHeader(r *bytes.Reader) (h MsgHeader) {
+func ParseMessageHeader(r *bytes.Reader) (h MsgHeader) {
 	endianFlag, _ := r.ReadByte()
 	h.byteOrder = binary.LittleEndian
 	if endianFlag != 1 {
@@ -66,7 +66,7 @@ func parseMessageHeader(r *bytes.Reader) (h MsgHeader) {
 	r.ReadByte() // ignore
 	r.ReadByte() // ignore
 	h.msgType, _ = r.ReadByte()
-	binary.Read(r, h.byteOrder, &h.msgLen)
+	binary.Read(r, h.byteOrder, &h.MsgLen)
 	return
 }
 
@@ -93,7 +93,7 @@ func readSym(r *bytes.Reader) KSym {
 // K3 data from bytes
 func Db(buf []byte) any {
 	r := bytes.NewReader(buf)
-	mh := parseMessageHeader(r)
+	mh := ParseMessageHeader(r)
 	return readDb(mh.byteOrder, r, false)
 }
 

@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <style type="text/css">
+      html, body, input, .term {
+        font-size: 16pt; font-family: consolas, monospace; width:100%;
+        margin:0; padding:0; border:0; background: black; overflow-x: hidden; }
+      .term { background: black; color: limegreen; min-height:1ex;
+              overflow:auto; }
+      .term div {  white-space: pre; }
+      .term .i { color: #ccc; padding-left: 1em; }
+      .term .m { color: purple; }
+      .term .e { color: tomato; }
+      .term .w { color: goldenrod; }
+      input { background: #333; color: #fff; width: calc(100% - 1em); padding-left: 1em; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="term">
+        <span v-for="entry in log">
+          <div class="m" v-if="entry.m">{{entry.m}}</div>
+          <div class="i" v-if="entry.i">{{entry.i}}</div>
+          <div class="o" v-if="entry.o">{{JSON.stringify(entry.o)}}</div>
+          <div class="e" v-if="entry.e">{{entry.e}}</div>
+          <div class="w" v-if="entry.w">  {{".:oO0Oo:"[waitsym]}}</div>
+        </span>
+      </div>
+      <input type="text" v-model="input" @keyup="keyup" ref="prompt"/>
+    </div>
+    <script type="text/javascript" src="kipc_ui.js"></script>
+  </body>
+</html>
